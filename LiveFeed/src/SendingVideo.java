@@ -7,7 +7,7 @@ import java.net.Socket;
 public class SendingVideo extends Thread {
 
 	public String filepath;
-	private String serverIP = "10.4.3.8";
+	private String serverIP = "192.168.1.103";
 	private int port = 6668;
 
 	@Override
