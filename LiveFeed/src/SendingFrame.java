@@ -21,10 +21,28 @@ public class SendingFrame extends Thread {
 		
 		while (true) {
 			try {
+				
 				socket = serverSocket.accept();
-				OutputStream out = socket.getOutputStream();
-				ImageIO.write(frame, "jpg", out);
-				socket.close();
+				new Thread(new Runnable(){
+					@Override
+					public void run() {
+						long time1 = System.currentTimeMillis();
+						try {
+							OutputStream out = socket.getOutputStream();
+							ImageIO.write(frame, "jpg", out);
+							socket.close();
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						
+
+						long time2 = System.currentTimeMillis();
+						System.out.println("time = " + (time2-time1));
+					}
+				}).start();
+				
+				
 			} catch (IOException e) {
 				System.out.println(String.format("connection_prob"));
 				e.printStackTrace();
