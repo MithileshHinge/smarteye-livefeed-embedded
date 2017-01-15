@@ -1,0 +1,111 @@
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
+
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.highgui.VideoCapture;
+
+import com.xuggle.mediatool.IMediaWriter;
+import com.xuggle.mediatool.ToolFactory;
+import com.xuggle.xuggler.ICodec;
+import com.xuggle.xuggler.video.ConverterFactory;
+
+public class Main extends Thread {
+
+	private static final String outputFilename = "C:\\Users\\Home\\Desktop\\videos\\";
+	private static IMediaWriter writer;
+	public static long startTime;
+	public static Date dNow;
+	public static SimpleDateFormat ft = new SimpleDateFormat("yyyy_MM_dd'at'hh_mm_ss_a");
+	public static boolean writer_close = false;
+
+	public static boolean startStore = false;
+	public static boolean stopStore = false;
+	public static boolean storing = false;
+	
+	public static String finalOutputFilename;
+	
+	static {
+		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+	}
+
+	public static void main(String[] args) {
+		VideoCapture cap = new VideoCapture(1);
+
+		if (!cap.isOpened()) {
+			System.out.println("Error - cannot open camera!");
+			return;
+		}
+
+		Thread t = new StoreSignalThread();
+		t.start();
+		
+		SendingFrame sendingFrame = new SendingFrame();
+		sendingFrame.start();
+		
+		while (true) {
+
+			if (startStore) {
+				System.out.println("DEBUG 1 : storing started");
+				dNow = new Date();
+				finalOutputFilename = outputFilename + ft.format(dNow) + ".mp4"; 
+				writer = ToolFactory.makeWriter(finalOutputFilename);
+				writer.addVideoStream(0, 0, ICodec.ID.CODEC_ID_MPEG4, 640, 480);
+				startTime = System.nanoTime();
+				startStore = false;
+				storing = true;
+			}
+
+			
+			Mat camImage = new Mat();
+			cap.read(camImage);
+
+			if (camImage.empty()) {
+				System.out.println(" --(!) No captured frame -- Break!");
+				continue;
+			}
+
+			BufferedImage camimg = matToImage(camImage);
+			BufferedImage image2 = ConverterFactory.convertToType(camimg, BufferedImage.TYPE_3BYTE_BGR);
+			
+			sendingFrame.frame = image2;
+			
+			// encode the image to stream #0
+			
+			if (storing)
+				writer.encodeVideo(0, image2, System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
+			// time4 = System.currentTimeMillis();
+
+			camImage.release();
+
+			if (stopStore) {
+				writer.close();
+				stopStore = false;
+				storing = false;
+				SendingVideo sendingVideo = new SendingVideo();
+				sendingVideo.filepath = finalOutputFilename;
+				sendingVideo.start();
+				finalOutputFilename = null;
+			}
+
+		}
+
+	}
+
+	public static BufferedImage matToImage(Mat m) {
+		int type = BufferedImage.TYPE_BYTE_GRAY;
+		if (m.channels() > 1) {
+			type = BufferedImage.TYPE_3BYTE_BGR;
+		}
+		int bufferSize = m.channels() * m.cols() * m.rows();
+		byte[] b = new byte[bufferSize];
+		m.get(0, 0, b); // get all the pixels
+		BufferedImage image = new BufferedImage(m.cols(), m.rows(), type);
+		final byte[] targetPixels = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
+		System.arraycopy(b, 0, targetPixels, 0, b.length);
+		return image;
+	}
+}
